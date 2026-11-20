@@ -12,11 +12,13 @@ from aidial_sdk.chat_completion import CustomContent, Role
 from aidial_sdk.chat_completion.request import Attachment as SdkAttachment
 from injector import AssistedBuilder
 
-from quickapp.common import StagedBaseTool, ToolCallResult
+from quickapp.common import REQUEST_MESSAGES, StagedBaseTool, ToolCallResult
 from quickapp.common.abstract.base_tool_argument_transformer import ToolArgumentTransformer
 from quickapp.common.base_stage_wrapper import BaseStageWrapper
 from quickapp.common.chat_completion_stream.argument_stream_presentation import ArgumentStreamMode
+from quickapp.common.deployment_parameter_support import remove_unsupported_parameters
 from quickapp.common.dial_request_fields import CONFIGURATION, CUSTOM_FIELDS
+from quickapp.common.form_utils import form_source_tool_name_before
 from quickapp.common.messages_mixin import MessagesMixin
 from quickapp.common.payload_logging import log_payload
 from quickapp.common.perf_timer.perf_timer import PerformanceTimer
@@ -46,6 +48,7 @@ class BaseDeploymentTool(StagedBaseTool):
         dial_completion_service: DialCompletionService,
         attachment_resolver: AttachmentResolver,
         messages_mixin: MessagesMixin,
+        request_messages: REQUEST_MESSAGES,
         perf_timer: PerformanceTimer,
         stage_wrapper_builder: AssistedBuilder[DeploymentStageWrapper],
         propagate_sub_stages: bool = True,
@@ -71,10 +74,28 @@ class BaseDeploymentTool(StagedBaseTool):
                 "Use 'conversation_mode.resumable: true' instead."
             )
         self.__messages_mixin: MessagesMixin = messages_mixin
+        self.__request_messages: REQUEST_MESSAGES = request_messages
 
     @staticmethod
     def _is_resumable(tool_config: DialDeploymentTool) -> bool:
         return tool_config.conversation_mode is not None and tool_config.conversation_mode.resumable
+
+    def _form_value_for_this_tool(self, tool_config: DialDeploymentTool):
+        """``form_value`` from the last raw user message, but only when this tool is the
+        source of the last form in history (the last tool message carrying
+        ``custom_content.form_schema`` resolves to this tool's name via tool_call_id).
+        """
+        if not self._is_resumable(tool_config):
+            return None
+        source_tool = form_source_tool_name_before(
+            self.__messages_mixin.messages, len(self.__messages_mixin.messages)
+        )
+        if source_tool != tool_config.open_ai_tool.function.name:
+            return None
+        for msg in reversed(self.__request_messages):
+            if msg.role == Role.USER and msg.custom_content is not None:
+                return msg.custom_content.form_value
+        return None
 
     def _setup_session(
         self,
@@ -139,11 +160,14 @@ class BaseDeploymentTool(StagedBaseTool):
             supports_url_attachments=tool_config.supports_url_attachments,
             parent_stage=parent_stage,
             system_prompt=tool_config.system_prompt.content if tool_config.system_prompt else None,
+            form_value=self._form_value_for_this_tool(tool_config),
         )
         if is_first_call and session_id:
             result.content = result.content + f"\n\n[session_id: {session_id}]"
         if not tool_config.propagate_annotations_to_choice:
             result.annotations = []
+        if not tool_config.propagate_form_schema_to_choice:
+            result.form_schema = None
         return result
 
     _SESSION_ID_PARAM = ConfigurableSchemaSimpleType(
@@ -272,6 +296,11 @@ class BaseDeploymentTool(StagedBaseTool):
                 ]
             if custom_content.state is not None:
                 cc_param["state"] = custom_content.state
+            form_value = custom_content.form_value
+            if form_value is None:
+                form_value = (custom_content.model_extra or {}).get("form_value")
+            if form_value is not None:
+                cc_param["form_value"] = form_value
             if cc_param:
                 assistant_msg["custom_content"] = cc_param
 
@@ -316,6 +345,14 @@ class BaseDeploymentTool(StagedBaseTool):
         # Applied after the model's own arguments: which tools the deployment may run is the
         # app's decision, so a `tools` argument the model invents cannot replace configured ones.
         self._apply_static_tools(params, prepared)
+
+        # Last, so a value the model passes as an argument is filtered too. `_features` is set
+        # only when the target's features were fetched: for a basic tool config, or a full tool
+        # that configures a gated parameter; otherwise parameters are sent unchanged.
+        features = tool_config.deployment._features
+        if features is not None:
+            # `prepared` is built in this method, so removing in place touches nothing shared.
+            remove_unsupported_parameters(prepared, features)
 
         logger.debug("Pre-processed tool parameters: keys=%s", list(prepared))
         log_payload(logger, "Pre-processed tool parameters: %s", prepared)

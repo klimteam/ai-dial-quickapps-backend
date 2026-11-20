@@ -4,6 +4,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from aidial_client.types.deployment import Features
 from aidial_sdk.chat_completion import Message, Role
 from aidial_sdk.chat_completion.request import Attachment as SdkAttachment
 from aidial_sdk.chat_completion.request import CustomContent, FunctionCall, ToolCall
@@ -105,6 +106,7 @@ def _build_tool(
         dial_completion_service=dial_completion_service,
         attachment_resolver=attachment_resolver,
         messages_mixin=_make_messages_mixin(messages),
+        request_messages=messages,
         perf_timer=MagicMock(),
         stage_wrapper_builder=MagicMock(),
         stage_display_level=StageDisplayLevel.INFO,
@@ -365,6 +367,7 @@ def _make_tool_config(
     configuration_param_names: set[str] | None = None,
     conversation_mode: ConversationMode | None = None,
     propagate_annotations_to_choice: bool | None = None,
+    features: Features | None = None,
 ) -> DialDeploymentTool:
     """Build a real DialDeploymentTool for _pre_process_params tests."""
     deployment = DialDeploymentToolConfig(
@@ -373,6 +376,7 @@ def _make_tool_config(
     )
     if configuration_param_names:
         deployment._configuration_param_names = configuration_param_names
+    deployment._features = features
     return DialDeploymentTool(
         deployment=deployment,
         conversation_mode=conversation_mode,
@@ -408,6 +412,7 @@ def _build_tool_with_config(
         dial_completion_service=MagicMock(),
         attachment_resolver=MagicMock(),
         messages_mixin=_make_messages_mixin(messages or []),
+        request_messages=messages or [],
         perf_timer=MagicMock(),
         stage_wrapper_builder=MagicMock(),
         stage_display_level=StageDisplayLevel.INFO,
@@ -484,6 +489,34 @@ async def test_pre_process_params_standard_params_stay_flat():
     assert result["custom_fields"]["configuration"]["size"] == "1024x1024"
 
 
+@pytest.mark.asyncio
+async def test_pre_process_params_drops_parameters_the_deployment_does_not_support():
+    """Configured and model-passed values alike are filtered by the target's features."""
+    tool_config = _make_tool_config(
+        parameters=DialDeploymentToolParameters(temperature=0.2, seed=7),
+        features=Features(temperature=False, reasoning_efforts=["low"]),
+    )
+    tool = _build_tool_with_config(tool_config)
+
+    result = await tool._pre_process_params(query="draw", reasoning_effort="high")
+
+    assert "temperature" not in result
+    assert "reasoning_effort" not in result
+    assert result["seed"] == 7
+    # The drop runs on the locally built payload; the shared tool config is untouched.
+    assert tool_config.deployment.parameters.temperature == 0.2
+
+
+@pytest.mark.asyncio
+async def test_pre_process_params_sends_parameters_unchanged_without_features():
+    tool_config = _make_tool_config(parameters=DialDeploymentToolParameters(temperature=0.2))
+    tool = _build_tool_with_config(tool_config)
+
+    result = await tool._pre_process_params(query="draw")
+
+    assert result["temperature"] == 0.2
+
+
 # ---------------------------------------------------------------------------
 # _extract_tool_history: empty content with state
 # ---------------------------------------------------------------------------
@@ -532,6 +565,7 @@ def _build_tool_with_propagation(
         dial_completion_service=dial_completion_service,
         attachment_resolver=MagicMock(),
         messages_mixin=_make_messages_mixin(messages),
+        request_messages=messages,
         perf_timer=MagicMock(),
         stage_wrapper_builder=MagicMock(),
         stage_display_level=StageDisplayLevel.INFO,
@@ -859,6 +893,7 @@ def _build_tool_with_content_propagation(
         dial_completion_service=MagicMock(),
         attachment_resolver=MagicMock(),
         messages_mixin=_make_messages_mixin([]),
+        request_messages=[],
         perf_timer=MagicMock(),
         stage_wrapper_builder=MagicMock(),
         stage_display_level=StageDisplayLevel.INFO,
@@ -981,3 +1016,118 @@ async def test_pre_process_params_llm_kwargs_do_not_replace_static_tools():
     assert result["tools"] == [
         {"type": "static_function", "static_function": {"name": "web_search"}}
     ]
+
+
+@pytest.mark.asyncio
+async def test_extract_preserves_response_form_value():
+    """TOOL message with custom_content.form_value → AssistantMessageParam carries form_value."""
+    messages: list[Message] = [
+        Message(role=Role.USER, content=StrictStr("Hello")),
+        _make_assistant_with_tool_calls(
+            [
+                _make_tool_call("tc1", "my_tool", "continue"),
+            ]
+        ),
+        _make_tool_result(
+            "tc1",
+            "partial result",
+            custom_content=CustomContent.model_validate(
+                {"state": {"k": 1}, "form_value": {"field": "val"}}
+            ),
+        ),
+    ]
+
+    tool = _build_tool(messages)
+    history = await tool._extract_tool_history("my_tool")
+
+    assert len(history) == 2
+    cc = history[1]["custom_content"]
+    assert cc["form_value"] == {"field": "val"}
+    assert cc["state"] == {"k": 1}
+
+
+def _history_with_form_schema(tool_name="test_tool", tool_call_id="tc-1", schema=None):
+    """assistant(tool_call) + tool(result with form_schema) pair."""
+    assistant = Message.model_validate(
+        {
+            "role": "assistant",
+            "content": "calling",
+            "tool_calls": [
+                {
+                    "id": tool_call_id,
+                    "type": "function",
+                    "function": {"name": tool_name, "arguments": "{}"},
+                }
+            ],
+        }
+    )
+    tool_msg = Message.model_validate(
+        {
+            "role": "tool",
+            "tool_call_id": tool_call_id,
+            "content": "result",
+            "custom_content": {"form_schema": schema or {"type": "object"}},
+        }
+    )
+    return [assistant, tool_msg]
+
+
+def _user_msg_with_form_value(form_value) -> Message:
+    return Message.model_validate(
+        {"role": "user", "content": "submitted", "custom_content": {"form_value": form_value}}
+    )
+
+
+class TestFormValueForThisTool:
+    def test_returns_form_value_when_this_tool_is_form_source_and_resumable(self):
+        messages = [*_history_with_form_schema(), _user_msg_with_form_value({"a": 1})]
+        tool = _build_tool_with_propagation(
+            messages, conversation_mode=ConversationMode(resumable=True)
+        )
+
+        assert tool._form_value_for_this_tool(tool.tool_config) == {"a": 1}
+
+    def test_none_when_tool_not_resumable(self):
+        messages = [*_history_with_form_schema(), _user_msg_with_form_value({"a": 1})]
+        tool = _build_tool_with_propagation(messages, conversation_mode=None)
+
+        assert tool._form_value_for_this_tool(tool.tool_config) is None
+
+    def test_none_when_form_source_is_another_tool(self):
+        messages = [
+            *_history_with_form_schema(tool_name="other_tool"),
+            _user_msg_with_form_value({"a": 1}),
+        ]
+        tool = _build_tool_with_propagation(
+            messages, conversation_mode=ConversationMode(resumable=True)
+        )
+
+        assert tool._form_value_for_this_tool(tool.tool_config) is None
+
+    def test_none_when_no_form_schema_in_history(self):
+        messages = [_user_msg_with_form_value({"a": 1})]
+        tool = _build_tool_with_propagation(
+            messages, conversation_mode=ConversationMode(resumable=True)
+        )
+
+        assert tool._form_value_for_this_tool(tool.tool_config) is None
+
+    def test_none_when_user_message_has_no_form_value(self):
+        messages = [*_history_with_form_schema(), Message(role=Role.USER, content="hi")]
+        tool = _build_tool_with_propagation(
+            messages, conversation_mode=ConversationMode(resumable=True)
+        )
+
+        assert tool._form_value_for_this_tool(tool.tool_config) is None
+
+    def test_uses_latest_form_schema_tool_call(self):
+        messages = [
+            *_history_with_form_schema(tool_name="other_tool", tool_call_id="tc-1"),
+            *_history_with_form_schema(tool_name="test_tool", tool_call_id="tc-2"),
+            _user_msg_with_form_value({"a": 1}),
+        ]
+        tool = _build_tool_with_propagation(
+            messages, conversation_mode=ConversationMode(resumable=True)
+        )
+
+        assert tool._form_value_for_this_tool(tool.tool_config) == {"a": 1}

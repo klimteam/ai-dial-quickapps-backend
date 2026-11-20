@@ -51,6 +51,7 @@ from quickapp.config.tools.display.paramenter import (
 from quickapp.core.agent._attachment_filter import _AttachmentFilter
 from quickapp.core.agent._chat_completion_config_builder import _ChatCompletionConfigBuilder
 from quickapp.core.agent._dial_system_prompt_initializer import _DialSystemPromptInitializer
+from quickapp.core.agent._form_value_content_transformer import _FormValueContentTransformer
 from quickapp.core.agent._messages_transformers import _AddSystemPromptTransformer
 from quickapp.core.agent._orchestrator_deployment_initializer import (
     _OrchestratorDeploymentInitializer,
@@ -126,6 +127,9 @@ class AgentModule(Module):
         binder.bind(
             _ScrubExtraFieldsTransformer, to=_ScrubExtraFieldsTransformer, scope=request_scope
         )
+        binder.bind(
+            _FormValueContentTransformer, to=_FormValueContentTransformer, scope=request_scope
+        )
         binder.bind(AgentSettings, to=AgentSettings, scope=singleton)
         binder.bind(ToolResultLimitSettings, to=ToolResultLimitSettings, scope=singleton)
         binder.bind(ToolCallResultSizeLimitProcessor, to=ToolCallResultSizeLimitProcessor)
@@ -161,16 +165,11 @@ class AgentModule(Module):
 
     @multiprovider
     def _provide_initialization_exceptions(
-        self,
-        initializer: _OrchestratorDeploymentInitializer,
-        system_prompt_initializer: _DialSystemPromptInitializer,
+        self, system_prompt_initializer: _DialSystemPromptInitializer
     ) -> list[InitializationException]:
         # Resolved by _InitializationErrorHandler after the initializers have run, so the
-        # lists already hold whatever initialize() recorded.
-        return [
-            *system_prompt_initializer.initialization_exceptions,
-            *initializer.initialization_exceptions,
-        ]
+        # list already holds whatever initialize() recorded.
+        return list(system_prompt_initializer.initialization_exceptions)
 
     @provider
     def provide_orchestrator_capabilities(
@@ -280,9 +279,11 @@ class AgentModule(Module):
     def provide_message_transformers(
         self,
         scrub_extra_fields: _ScrubExtraFieldsTransformer,
+        form_value_content: _FormValueContentTransformer,
         add_system_prompt: _AddSystemPromptTransformer,
     ) -> list[MessagesTransformer]:
         return [
+            form_value_content,
             scrub_extra_fields,
             add_system_prompt,
         ]
