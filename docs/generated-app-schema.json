@@ -194,17 +194,6 @@
           "default": null,
           "description": "The configuration for the tool parameter in stage."
         },
-        "default": {
-          "anyOf": [
-            {},
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "The default value if value is not set",
-          "title": "Default"
-        },
         "type": {
           "const": "array",
           "title": "Type",
@@ -242,6 +231,17 @@
         "description": {
           "title": "Description",
           "type": "string"
+        },
+        "default": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The default value if value is not set",
+          "title": "Default"
         }
       },
       "required": [
@@ -265,17 +265,6 @@
           ],
           "default": null,
           "description": "The configuration for the tool parameter in stage."
-        },
-        "default": {
-          "anyOf": [
-            {},
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "The default value if value is not set",
-          "title": "Default"
         },
         "type": {
           "const": null,
@@ -306,17 +295,6 @@
           ],
           "default": null,
           "description": "The configuration for the tool parameter in stage."
-        },
-        "default": {
-          "anyOf": [
-            {},
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "The default value if value is not set",
-          "title": "Default"
         },
         "type": {
           "const": "object",
@@ -373,6 +351,17 @@
           ],
           "default": null,
           "title": "Required"
+        },
+        "default": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The default value if value is not set",
+          "title": "Default"
         }
       },
       "required": [
@@ -396,17 +385,6 @@
           ],
           "default": null,
           "description": "The configuration for the tool parameter in stage."
-        },
-        "default": {
-          "anyOf": [
-            {},
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "The default value if value is not set",
-          "title": "Default"
         },
         "type": {
           "enum": [
@@ -442,6 +420,17 @@
           ],
           "default": null,
           "title": "Enum"
+        },
+        "default": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The default value if value is not set",
+          "title": "Default"
         }
       },
       "required": [
@@ -877,6 +866,32 @@
           ],
           "default": null,
           "description": "Conversation session behavior for the DIAL deployment tool. Applies only on the chat-completion branch; ignored (with a warning) when the toolset resolves to MCP."
+        },
+        "propagate_form_schema_to_choice": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Propagate the form returned by the deployment onto the app's choice. The deployment's `custom_content.form_schema` is sent to the client. Within one deployment stream the last schema wins; across tools in one response the first one wins (the SDK allows a single form per choice). Applies only on the chat-completion branch; ignored (with a warning) when the toolset resolves to MCP.",
+          "title": "Propagate Form Schema To Choice"
+        },
+        "propagate_form_value_to_content": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When the form's source tool is not resumable, append the submitted `custom_content.form_value` to the message content as a `<form_value>` block so the orchestrator model can use it. When false or unset, the value is only kept in `custom_content` (consumed by deployment tools). Applies only on the chat-completion branch; ignored (with a warning) when the toolset resolves to MCP.",
+          "title": "Propagate Form Value To Content"
         }
       },
       "required": [
@@ -1107,6 +1122,32 @@
           "description": "Propagate citation annotations returned by the deployment (`choices[].delta.custom_fields.annotations`) onto the app's choice. Annotations are forwarded unchanged; the orchestrator is instructed to copy the matching `<cit data-id=\"...\"></cit>` anchors verbatim into its answer.",
           "title": "Propagate Annotations To Choice"
         },
+        "propagate_form_schema_to_choice": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Propagate the form returned by the deployment onto the app's choice. The deployment's `custom_content.form_schema` is sent to the client. Within one deployment stream the last schema wins; across tools in one response the first one wins (the SDK allows a single form per choice).",
+          "title": "Propagate Form Schema To Choice"
+        },
+        "propagate_form_value_to_content": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When the form's source tool is not resumable, append the submitted `custom_content.form_value` to the message content as a `<form_value>` block so the orchestrator model can use it. When false or unset, the value is only kept in `custom_content` (consumed by deployment tools).",
+          "title": "Propagate Form Value To Content"
+        },
         "type": {
           "const": "dial-deployment-simple",
           "default": "dial-deployment-simple",
@@ -1225,6 +1266,32 @@
           "default": null,
           "description": "Propagate citation annotations returned by the deployment (`choices[].delta.custom_fields.annotations`) onto the app's choice. Annotations are forwarded unchanged; the orchestrator is instructed to copy the matching `<cit data-id=\"...\"></cit>` anchors verbatim into its answer.",
           "title": "Propagate Annotations To Choice"
+        },
+        "propagate_form_schema_to_choice": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Propagate the form returned by the deployment onto the app's choice. The deployment's `custom_content.form_schema` is sent to the client. Within one deployment stream the last schema wins; across tools in one response the first one wins (the SDK allows a single form per choice).",
+          "title": "Propagate Form Schema To Choice"
+        },
+        "propagate_form_value_to_content": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When the form's source tool is not resumable, append the submitted `custom_content.form_value` to the message content as a `<form_value>` block so the orchestrator model can use it. When false or unset, the value is only kept in `custom_content` (consumed by deployment tools).",
+          "title": "Propagate Form Value To Content"
         },
         "supports_url_attachments": {
           "default": false,
@@ -1488,8 +1555,9 @@
               "type": "null"
             }
           ],
-          "description": "Offload oversized tool-call responses to a file, read back on demand via the read_lines / search file tools. Toggled by its `enabled` flag, whose default is governed by TOOL_CALL_RESULT_OFFLOAD__ENABLED_BY_DEFAULT. Requires read_lines and search to be exposed via enabled_tools.",
-          "x-preview": true
+          "default": null,
+          "deprecated": true,
+          "description": "**Deprecated, use `features.tool_call_result_offload`**. Honored only when `features.tool_call_result_offload` is not set."
         },
         "max_files_scanned": {
           "default": 50,
@@ -1828,6 +1896,10 @@
           "$ref": "#/$defs/StageDisplayConfig",
           "description": "Controls which stage levels are rendered to the user."
         },
+        "initialization_issues": {
+          "$ref": "#/$defs/InitializationIssuesConfig",
+          "description": "Controls which issue levels the Initialization issues stage shows."
+        },
         "dial_files": {
           "anyOf": [
             {
@@ -1838,6 +1910,10 @@
             }
           ],
           "description": "Built-in DIAL files tools (list / read / search / write / edit / delete / copy / move). When omitted, null or empty, all tools are exposed; use `enabled_tools: read_only` to expose only the non-mutating ones. `null` is accepted for backward compatibility only and is treated as the default."
+        },
+        "tool_call_result_offload": {
+          "$ref": "#/$defs/ToolCallResultOffloadConfig",
+          "description": "Offload oversized tool-call responses to a file, read back on demand via the read_lines / search file tools. Toggled by its `enabled` flag, whose default is governed by TOOL_CALL_RESULT_OFFLOAD__ENABLED_BY_DEFAULT. Requires read_lines and search to be exposed via `dial_files.enabled_tools`."
         },
         "web_fetch": {
           "anyOf": [
@@ -2147,6 +2223,41 @@
       "title": "HookEvent",
       "type": "string"
     },
+    "HookExecution": {
+      "enum": [
+        "blocking",
+        "background"
+      ],
+      "title": "HookExecution",
+      "type": "string"
+    },
+    "InitializationIssueLevel": {
+      "enum": [
+        "warning",
+        "error",
+        "critical"
+      ],
+      "title": "InitializationIssueLevel",
+      "type": "string"
+    },
+    "InitializationIssuesConfig": {
+      "properties": {
+        "level": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InitializationIssueLevel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Lowest issue level shown in the Initialization issues stage: warning=all issues; error=errors and critical failures; critical=critical failures only. Hidden issues are still logged. Unset defers to `DEFAULT_INITIALIZATION_ISSUES_LEVEL`."
+        }
+      },
+      "title": "InitializationIssuesConfig",
+      "type": "object"
+    },
     "InjectionFrequency": {
       "enum": [
         "always",
@@ -2324,6 +2435,17 @@
         "description": {
           "title": "Description",
           "type": "string"
+        },
+        "default": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The default value if value is not set",
+          "title": "Default"
         }
       },
       "required": [
@@ -2409,6 +2531,17 @@
           ],
           "default": null,
           "title": "Required"
+        },
+        "default": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The default value if value is not set",
+          "title": "Default"
         }
       },
       "required": [
@@ -2455,6 +2588,17 @@
           ],
           "default": null,
           "title": "Enum"
+        },
+        "default": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The default value if value is not set",
+          "title": "Default"
         }
       },
       "required": [
@@ -3203,17 +3347,6 @@
           "default": null,
           "description": "The configuration for the tool parameter in stage."
         },
-        "default": {
-          "anyOf": [
-            {},
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "The default value if value is not set",
-          "title": "Default"
-        },
         "type": {
           "const": "array",
           "title": "Type",
@@ -3251,6 +3384,17 @@
         "description": {
           "title": "Description",
           "type": "string"
+        },
+        "default": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The default value if value is not set",
+          "title": "Default"
         }
       },
       "required": [
@@ -3278,17 +3422,6 @@
           ],
           "default": null,
           "description": "The configuration for the tool parameter in stage."
-        },
-        "default": {
-          "anyOf": [
-            {},
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "The default value if value is not set",
-          "title": "Default"
         },
         "type": {
           "const": null,
@@ -3358,17 +3491,6 @@
           "default": null,
           "description": "The configuration for the tool parameter in stage."
         },
-        "default": {
-          "anyOf": [
-            {},
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "The default value if value is not set",
-          "title": "Default"
-        },
         "type": {
           "const": "object",
           "title": "Type",
@@ -3424,6 +3546,17 @@
           ],
           "default": null,
           "title": "Required"
+        },
+        "default": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The default value if value is not set",
+          "title": "Default"
         }
       },
       "required": [
@@ -3451,17 +3584,6 @@
           ],
           "default": null,
           "description": "The configuration for the tool parameter in stage."
-        },
-        "default": {
-          "anyOf": [
-            {},
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "The default value if value is not set",
-          "title": "Default"
         },
         "type": {
           "enum": [
@@ -3497,6 +3619,17 @@
           ],
           "default": null,
           "title": "Enum"
+        },
+        "default": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The default value if value is not set",
+          "title": "Default"
         }
       },
       "required": [
@@ -3895,6 +4028,11 @@
         "event": {
           "$ref": "#/$defs/HookEvent"
         },
+        "execution": {
+          "$ref": "#/$defs/HookExecution",
+          "default": "blocking",
+          "description": "'blocking' (default) awaits the hook before the response closes. 'background' runs it without delaying the response: its result is discarded, it shows no stage and failures are only logged. Only supported for 'on_completion'."
+        },
         "name": {
           "anyOf": [
             {
@@ -3976,7 +4114,7 @@
       "description": "Per-app config for offloading oversized tool-call responses to DIAL files.\n\nToggled by the explicit `enabled` flag; `size_threshold` / `excluded_tools`\nare carried regardless so an app can disable offload without losing its\noverrides. Field defaults come from `ToolCallResultOffloadSettings` so env\nvars set the global baseline.",
       "properties": {
         "enabled": {
-          "description": "Whether to offload oversized tool-call responses to a file. Defaults to the TOOL_CALL_RESULT_OFFLOAD__ENABLED_BY_DEFAULT env var. Requires read_lines and search to be exposed via enabled_tools.",
+          "description": "Whether to offload oversized tool-call responses to a file. Defaults to the TOOL_CALL_RESULT_OFFLOAD__ENABLED_BY_DEFAULT env var. Requires read_lines and search to be exposed via dial_files.enabled_tools.",
           "title": "Enabled",
           "type": "boolean"
         },

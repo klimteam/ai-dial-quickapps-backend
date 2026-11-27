@@ -501,7 +501,8 @@ applicable).
 Omitting `features` (or setting `{}`) still constructs the default `Features` object — time
 awareness stays **on**, and nested objects like `file_loading` / `stage_display` use their defaults.
 Setting `"features": null` turns off those defaults (no timestamp feature, no per-app dial-files /
-external-fetch overrides; stage display falls back to `info` unless `DEFAULT_STAGE_DISPLAY_LEVEL` is set).
+external-fetch overrides; stage display falls back to `info` unless `DEFAULT_STAGE_DISPLAY_LEVEL` is set; the
+initialization issues level falls back to `DEFAULT_INITIALIZATION_ISSUES_LEVEL`).
 
 | Field                    | Required | Type           | Description                                                                                                                                                                  | Default Value                          |
 |--------------------------|----------|----------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------|
@@ -510,7 +511,9 @@ external-fetch overrides; stage display falls back to `info` unless `DEFAULT_STA
 | `external_url_fetch`     | No       | Object         | Per-app override for fetching external (non-DIAL) URLs. See [External URL fetch configuration](#external-url-fetch-configuration).                                           | `{}`                                   |
 | `tool_access_filter`     | No       | Object or null | Per-user tool access filtering: hide DIAL deployment, application and `dial-mcp` toolset tools the calling user cannot access. See [Tool access filter configuration](#tool-access-filter-configuration). | `null`                                 |
 | `stage_display`          | No       | Object         | Which tool-execution stages appear in the DIAL UI. See [Stage display configuration](#stage-display-configuration).                                                          | `{"level": "info"}`                    |
+| `initialization_issues`  | No       | Object         | Which issue levels the *Initialization issues* stage shows. See [Initialization issues configuration](#initialization-issues-configuration).                            | `{}`                                   |
 | `dial_files`             | No       | Object or null | Built-in DIAL workspace file tools. Omitted (default) exposes all tools, same as `{}`; `null` is accepted for backward compatibility and treated the same. See [DIAL files configuration](#dial-files-configuration). | `{}`                                   |
+| `tool_call_result_offload` | No     | Object         | Offload oversized tool responses to a DIAL file. See [Tool-call result offload](#tool-call-result-offload). | defaults from env |
 | `web_fetch`              | No       | Object or null | Built-in `internal_web_fetch` tool. See [Web fetch configuration](#web-fetch-configuration).                                                                                 | `null`                                 |
 | `representation_tooling` | No       | Object or null | Tools that control how the agent surfaces output (e.g. add attachment to the answer). See [Representation tooling](#representation-tooling-configuration).                   | `null`                                 |
 
@@ -654,6 +657,32 @@ Controls which tool-execution stages are surfaced in the DIAL UI. The deployment
 }
 ```
 
+#### Initialization issues configuration
+
+Controls which issues the *Initialization issues* stage shows. Issues below the level are left out of
+the stage but still logged. If every issue is hidden, the stage isn't shown. A per-app `level` overrides
+the deployment-wide `DEFAULT_INITIALIZATION_ISSUES_LEVEL`; unset (default) defers to it.
+
+| Field   | Required | Type   | Description                     | Available Values                 | Default Value                          |
+|---------|----------|--------|---------------------------------|----------------------------------|----------------------------------------|
+| `level` | No       | String | Lowest issue level that's shown | `warning`, `error`, `critical`   | `null` (uses `DEFAULT_INITIALIZATION_ISSUES_LEVEL`) |
+
+| Value      | Shown                                                                                                   |
+|------------|---------------------------------------------------------------------------------------------------------|
+| `warning`  | Everything, including skill warnings (e.g. a DIAL skill's bundled files couldn't be listed)              |
+| `error`    | Errors and critical issues: something was skipped (a skill, a hook, offload, PROJECT.md)                 |
+| `critical` | Only issues that mark the stage failed, e.g. a tool or toolset that couldn't be initialized              |
+
+```json
+{
+  "features": {
+    "initialization_issues": {
+      "level": "error"
+    }
+  }
+}
+```
+
 #### DIAL files configuration
 
 The built-in workspace file tools (`internal_file_*`) are on by default: an app that omits `dial_files`
@@ -669,7 +698,7 @@ validating, but it is treated as the default. It used to mean "file tools off"; 
 | `enabled_tools`            | No       | `"all"`, `"read_only"` or Array[String] | Which tools to expose. `"all"` = every tool, `"read_only"` = `list`, `read_lines`, `read_chars`, `search`, `find`. A list restricts to the given short names: `list`, `read_lines`, `read_chars`, `search`, `find`, `write`, `edit`, `delete`, `copy`, `move`. | `"all"` (also when `dial_files` is omitted) |
 | `agent_home_dir`           | No       | String                       | Relative sub-directory under appdata used as the root for relative paths. Must end with `/`; no `files/…`, leading `/`, or `..`. Empty = appdata root. | `""`          |
 | `max_files_scanned`        | No       | Integer (`≥ 1`)              | Folder-mode `search` cap: max files downloaded/scanned per call before truncation.                                                          | `50`          |
-| `tool_call_result_offload` | No       | Object or null               | `[Preview]` Offload oversized tool responses to a DIAL file. See below. Requires `read_lines` and `search` in `enabled_tools`.                          | defaults (see below) |
+| `tool_call_result_offload` | No       | Object or null               | **Deprecated, use [`features.tool_call_result_offload`](#tool-call-result-offload).** Honored only when the new field is not set; a warning is logged. | `null` |
 
 `read_chars(path, offset, length)` reads a file by character offset instead of by line, so a file with
 a few very long lines (for example 20 lines of 400 KB) can still be read page by page. To keep the
@@ -678,12 +707,18 @@ reports the total length and the next offset. `read_lines` and `search` apply th
 and shorten any line longer than 2000 characters with a pointer to `read_chars`. These tools are
 excluded from offload, so the cap is what keeps their output small.
 
-##### Tool-call result offload
+#### Tool-call result offload
 
-Nested under `features.dial_files.tool_call_result_offload`. Requires `ENABLE_PREVIEW_FEATURES=true`.
-An app without a `dial_files` block (or with `"dial_files": null` / `{}`) gets the default block, so
-offload follows the env default below and does not need an explicit `dial_files` entry.
-Env defaults: `TOOL_CALL_RESULT_OFFLOAD__*`.
+`features.tool_call_result_offload`. On by default: a tool response at or above `size_threshold` bytes is
+saved to a DIAL file and the model gets a short notice pointing at it, to be read back with
+`internal_file_read_lines` / `internal_file_search`. This also applies when the `features` section is
+omitted or `null`. Env defaults: `TOOL_CALL_RESULT_OFFLOAD__*`.
+
+Offload needs `read_lines` and `search` in `dial_files.enabled_tools` (both are there by default). If either
+is missing, offload is turned off for the app and an initialization warning is shown.
+
+The old location `features.dial_files.tool_call_result_offload` is deprecated. It is still honored when
+`features.tool_call_result_offload` is not set.
 
 Independently of this feature, a response of any tool that is still longer than 80000 characters after
 offload (offload disabled or unavailable, tool excluded, or upload failed) is not passed to the model:
@@ -701,13 +736,9 @@ never rejected.
 ```json
 {
   "features": {
-    "dial_files": {
-      "enabled_tools": "all",
-      "agent_home_dir": "workspace/",
-      "tool_call_result_offload": {
-        "enabled": true,
-        "size_threshold": 40000
-      }
+    "tool_call_result_offload": {
+      "enabled": true,
+      "size_threshold": 40000
     }
   }
 }
@@ -835,12 +866,14 @@ model) see [docs/hooks.md](docs/hooks.md); the design is in
 | `tool_name`         | Yes      | String | Tool name within the toolset (or exact function name) | - |
 | `arguments`         | No       | Object | Arguments forwarded to the tool. Rendered as a [JSON-e](https://json-e.js.org) template against the hook context, see [Argument templates](#hook-argument-templates) | `{}` |
 | `name`              | No       | String | Optional hook label used in logs | `null` |
+| `execution`         | No       | String | `"blocking"` awaits the hook before the response closes; `"background"` runs it without delaying the response (no result, no stage, failures only logged). `"background"` is valid for `on_completion` only. See [Background hooks](docs/hooks.md#background-hooks) | `blocking` |
 | `timeout_seconds`   | No       | Number | Per-hook timeout (`> 0`). A hook that times out is logged and skipped. Defaults: 15 s for `on_request_start`, 30 s for `on_completion` | `null` |
 | `frequency`         | No       | String | `on_request_start` only: `"always"` or `"append_if_changed"` | `append_if_changed` |
 | `refresh_condition` | No       | Object | `on_request_start` only: optional TTL refresh (`{"kind":"ttl","ttl_minutes":N}`). Cannot be combined with templated `arguments` | `null` |
 
 `frequency` and `refresh_condition` describe how the injected message pair is kept in the history, so they
-are rejected for `on_completion`. An `on_completion` hook runs for its side effect only: the tool result is
+are rejected for `on_completion`. `execution: background` is rejected for `on_request_start`, whose result
+the model needs before it answers. An `on_completion` hook runs for its side effect only: the tool result is
 discarded and is never shown to the user or added to the conversation. A failing or timed-out hook never
 fails the request: the error is logged and the hook is skipped.
 
@@ -1154,6 +1187,8 @@ have different semantics and will diverge once the deployment-scoped endpoint la
 | attachment             | No       | AttachmentConfig   | Propagated on both branches. See also: [AttachmentConfig](#attachment-configuration)                                                                                                       | -             |
 | fallback_configuration | No       | ToolFallbackConfig | Propagated on both branches. See also: [Tool fallback configuration](#tool-fallback-configuration)                                                                                         | -             |
 | conversation_mode      | No       | Object             | Resumable conversation for the **chat-completion** branch only; ignored (with a warning) on MCP. See [Conversation mode](#conversation-mode)                                              | `null`        |
+| propagate_form_schema_to_choice | No       | Boolean            | Propagate the deployment's `custom_content.form_schema` to the app's answer on the **chat-completion** branch only; ignored (with a warning) on MCP. See [Form schema propagation](#form-schema-propagation) | `null`        |
+| propagate_form_value_to_content | No       | Boolean            | Append the submitted `custom_content.form_value` to the message content as a `<form_value>` block so the orchestrator model can use it. See [Form schema propagation](#form-schema-propagation) | `null`        |
 
 #### MCP per-tool configuration
 
@@ -1317,6 +1352,8 @@ The same as ApiKeyAuthorization but for mcp location is not configurable and alw
 | display                | No                                   | Object | Representation (display) configuration for tool execution results. See [Display configuration](#display-configuration), See [Tool stage configuration](#display-tool-stage-configuration) | -                | `null`        |
 | fallback_configuration | No                                   | Object | Tools fallback configuration. If not present will always raise Error. See [Tool fallback configuration](#tool-fallback-configuration)                                                     | -                | `null`        |
 | propagate_annotations_to_choice | No                          | Boolean | Only for `deployment-tool` and `dial-deployment-simple`. Propagate citation annotations returned by the deployment to the app's answer. See [Citation annotations](#citation-annotations)               | `true`, `false`  | `null`        |
+| propagate_form_schema_to_choice | No                            | Boolean | Only for `deployment-tool`, `dial-deployment-simple`, and `dial-app` (chat-completion branch only). Propagate the deployment's `custom_content.form_schema` to the app's answer. See [Form schema propagation](#form-schema-propagation) | `true`, `false`  | `null`        |
+| propagate_form_value_to_content | No                            | Boolean | Only for `deployment-tool`, `dial-deployment-simple`, and `dial-app` (chat-completion branch only). Append the submitted `custom_content.form_value` to the message content as a `<form_value>` block so the orchestrator model can use it. See [Form schema propagation](#form-schema-propagation) | `true`, `false`  | `null`        |
 | conversation_mode               | No                          | Object  | Resumable subagent conversation. Applies to `deployment-tool`, `dial-deployment-simple`, and `dial-app` (chat-completion branch only). See [Conversation mode](#conversation-mode) | - | `null` |
 | content_propagation             | No                          | Object  | Header / **deprecated** history propagation. Prefer `conversation_mode`. See [Content propagation](#content-propagation-deprecated-history-flag) | - | `null` |
 | system_prompt                   | No                          | Object  | Only for `deployment-tool`. Sent to the deployment as a system message. Accepts `custom` and `dial`, not `predefined`. See [System prompt configuration](#system-prompt-configuration) | - | `null` |
@@ -1375,6 +1412,34 @@ DIAL Chat does not render annotations yet.
   "type": "dial-deployment-simple",
   "deployment_id": "dial-document",
   "propagate_annotations_to_choice": true
+}
+```
+
+#### Form schema propagation
+
+A DIAL application used as a deployment tool can return a form schema under
+`choices[].delta.custom_content.form_schema`. Set `propagate_form_schema_to_choice: true` on that tool
+(or on a `dial-app` toolset, chat-completion branch) to forward the schema to your app's answer via
+`choice.set_form_schema` — the client renders it as an interactive form. The SDK allows sending the
+schema only once per response, so when several tools return one, the first wins.
+
+The schema is kept on the tool message's `custom_content.form_schema` in the conversation history.
+On the next request, when the client submits the form
+(`custom_content.form_value` on a message), QuickApps recovers the form's source tool from the
+history before that message: it takes the first tool message carrying a `form_schema` in the latest
+turn segment that has one, and resolves the tool name via that message's `tool_call_id` and the
+assistant message's `tool_calls`. The value is then routed by that tool, through two independent
+mechanisms: if the tool being called is the source tool, the value is attached to the final user
+message of the deployment request as `custom_content.form_value`; and if the source tool has
+`propagate_form_value_to_content: true`, the value is also appended to the message content as a
+`<form_value>` block so the orchestrator model can use it
+(with the flag unset or false, the value stays only in `custom_content`).
+
+```json
+{
+  "type": "dial-deployment-simple",
+  "deployment_id": "report-generator",
+  "propagate_form_schema_to_choice": true
 }
 ```
 
@@ -1843,6 +1908,11 @@ behave the same. Use `true` only for apps that make no sense outside a project.
 | `DIAL_API_VERSION`                         | `2025-01-01-preview`                                            | No       | API version for DIAL Core API                                                                                |
 | `APP_SCHEMA_ID`                            | `https://mydial.epam.com/custom_application_schemas/quickapps2` | No       | Full application type schema `$id` emitted in the generated app schema. When unset, the built-in default is used. |
 | `DIAL_INTERACTIVE_LOGIN_TIMEOUT_SECONDS`   | `120.0`                                                         | No       | Wall-clock timeout (seconds) waiting for the user to complete interactive sign-in when an MCP toolset returns 401 / an external-service sign-in challenge. See [docs/agent.md](./agent.md) (Interactive login). |
+| **Background hooks**                       |                                                                 |          |                                                                                                              |
+| `BACKGROUND_HOOKS_MAX_CONCURRENT`          | `50`                                                            | No       | Maximum `execution: background` hooks running at once in one process. A hook over the limit is rejected: logged at ERROR level and shown to the user as a failed stage. See [docs/hooks.md](docs/hooks.md#background-hooks). |
+| `BACKGROUND_HOOKS_WARN_THRESHOLD`          | `40`                                                            | No       | Running background hooks above which each newly started hook is logged with a warning. Must be below `BACKGROUND_HOOKS_MAX_CONCURRENT`. |
+| `BACKGROUND_HOOKS_RESPONSE_HOLD_SECONDS`   | `3.0`                                                           | No       | At most how long the response stays open after a turn so background hooks' calls can reach DIAL Core (a call arriving after the response closed gets a 401). Fast hooks end the wait early. |
+| `BACKGROUND_HOOKS_SHUTDOWN_GRACE_SECONDS`  | `30.0`                                                          | No       | On shutdown, how long to wait for running background hooks before cancelling them. Keep it below the pod's termination grace period (Kubernetes default: 30 s), or the drain is killed partway. |
 | **Proxy**                                  |                                                                 |          |                                                                                                              |
 | `PROXY_LANGUAGE_HEADER`                    | `accept-language`                                               | No       | Name of the incoming HTTP request header that carries the locale for UI display (stage name localization). Override when a reverse proxy rewrites the standard `Accept-Language` header before forwarding the request. |
 | **Logging**                                |                                                                 |          |                                                                                                              |
@@ -1871,11 +1941,13 @@ behave the same. Use `true` only for apps that make no sense outside a project.
 | `DEFAULT_FILE_LOADING_SIZE_LIMIT`          | `10485760`                                                      | No       | Deployment-wide default maximum size (in bytes) for files the agent downloads. Apps can override per-app via `features.file_loading.size_limit`. |
 | **Stage Display**                          |                                                                 |          |                                                                                                              |
 | `DEFAULT_STAGE_DISPLAY_LEVEL`              | —                                                               | No       | Deployment-wide override for stage visibility threshold (`none`, `error`, `info`, `debug`; case-insensitive). When set, wins over every app's `features.stage_display.level`. Unset (default) defers to the per-app config, which defaults to `info`. |
-| **DIAL Files — Tool-Response Offload**     |                                                                 |          |                                                                                                              |
-| `TOOL_CALL_RESULT_OFFLOAD__ENABLED_BY_DEFAULT` | `true`                                                          | No       | Default value of the per-app `enabled` flag (`features.dial_files.tool_call_result_offload.enabled`). Apps override per-app; `enabled: false` disables offload for that app. |
-| `TOOL_CALL_RESULT_OFFLOAD__SIZE_THRESHOLD` | `40000`                                                         | No       | Default byte threshold above which a tool-call response is offloaded to a DIAL file. Apps override per-app via `features.dial_files.tool_call_result_offload.size_threshold`. |
+| **Initialization Issues**                  |                                                                 |          |                                                                                                              |
+| `DEFAULT_INITIALIZATION_ISSUES_LEVEL`      | `warning`                                                       | No       | Deployment-wide lowest level shown in the *Initialization issues* stage (`warning`, `error`, `critical`; case-insensitive). Apps can override per-app via `features.initialization_issues.level`. |
+| **Tool-Response Offload**                  |                                                                 |          |                                                                                                              |
+| `TOOL_CALL_RESULT_OFFLOAD__ENABLED_BY_DEFAULT` | `true`                                                          | No       | Default value of the per-app `enabled` flag (`features.tool_call_result_offload.enabled`). Apps override per-app; `enabled: false` disables offload for that app. |
+| `TOOL_CALL_RESULT_OFFLOAD__SIZE_THRESHOLD` | `40000`                                                         | No       | Default byte threshold above which a tool-call response is offloaded to a DIAL file. Apps override per-app via `features.tool_call_result_offload.size_threshold`. |
 | `TOOL_CALL_RESULT_LIMIT__MAX_CHARS`        | `80000`                                                         | No       | Maximum length, in characters, of any tool response that reaches the model. A longer response (still over the limit after offload) is replaced by a "response too large" error. Must be at least `TOOL_CALL_RESULT_OFFLOAD__SIZE_THRESHOLD`, and at least any per-app `size_threshold`. |
-| `TOOL_CALL_RESULT_OFFLOAD__EXCLUDED_TOOLS` | `[]`                                                            | No       | Default JSON list of **additional** tool names exempt from offloading. The read-back tools (`internal_file_read_lines`, `internal_file_read_chars`, `internal_file_search`) and `read_skill` are always excluded regardless of this value, so a large read-back slice is never re-offloaded. Apps add more per-app via `features.dial_files.tool_call_result_offload.excluded_tools`. |
+| `TOOL_CALL_RESULT_OFFLOAD__EXCLUDED_TOOLS` | `[]`                                                            | No       | Default JSON list of **additional** tool names exempt from offloading. The read-back tools (`internal_file_read_lines`, `internal_file_read_chars`, `internal_file_search`) and `read_skill` are always excluded regardless of this value, so a large read-back slice is never re-offloaded. Apps add more per-app via `features.tool_call_result_offload.excluded_tools`. |
 | **External URL Egress**                    |                                                                 |          |                                                                                                              |
 | `EXTERNAL_URL_FETCH_ENABLED`                 | `false`                                                         | No       | Admin cap on fetching external (non-DIAL) URLs. When `false` (default), no app may fetch external URLs regardless of its manifest; the deployment-handoff branch (deployments with `features.url_attachments`) is unaffected. Apps can opt out per-app via `features.external_url_fetch.enabled=false` even when the admin allows. |
 | `EXTERNAL_URL_FETCH_HOST_ALLOWLIST`        | —                                                               | No       | Comma-separated allowlist of host patterns for external URL fetches. Unset (default) means no admin-level host restriction. Patterns: exact host (`example.com`) or `*.example.com` for any subdomain. Re-checked on every redirect hop. Per-app `features.external_url_fetch.host_allowlist` narrows further (intersection) but never expands. |

@@ -43,11 +43,14 @@ See [Feature Lifecycle](../README.md#feature-lifecycle) in the root README.
 | File transfer (`file:{prefix}::`) | — | [file_transfer.md](./file_transfer.md) | — |
 | External URL egress | [CONFIGURATION — External URL fetch](../CONFIGURATION.md#external-url-fetch-configuration) | [file_transfer.md](./file_transfer.md) | [external_url_attachments.md](./designs/external_url_attachments.md) |
 | DIAL files tools | [CONFIGURATION — DIAL files](../CONFIGURATION.md#dial-files-configuration) | — | [dial_files_tools.md](./designs/dial_files_tools.md) |
+| Tool-call result offload | [CONFIGURATION — Tool-call result offload](../CONFIGURATION.md#tool-call-result-offload) | — | [large_tool_responses.md](./designs/large_tool_responses.md) |
 | Tool access filter | [CONFIGURATION — Tool access filter](../CONFIGURATION.md#tool-access-filter-configuration) | [agent.md](./agent.md#tool-access-filter) | [access_aware_tool_availability.md](./designs/access_aware_tool_availability.md) |
 | Stage display | [CONFIGURATION — Stage display](../CONFIGURATION.md#stage-display-configuration) | — | [stage_display_level.md](./designs/stage_display_level.md) |
+| Initialization issues level | [CONFIGURATION — Initialization issues](../CONFIGURATION.md#initialization-issues-configuration) | [agent.md](./agent.md#6-error-handling) | — |
 | Nested sub-stage propagation | [CONFIGURATION — Stage display](../CONFIGURATION.md#stage-display-configuration) | — | [sub-stage-propagation.md](./designs/sub-stage-propagation.md) |
 | Time awareness | [CONFIGURATION — Timestamp](../CONFIGURATION.md#timestamp-configuration) | [time_awareness.md](./time_awareness.md) | [time_awareness.md](./designs/time_awareness.md), [user_timezone.md](./designs/user_timezone.md) |
 | Resumable subagents | [CONFIGURATION — Conversation mode](../CONFIGURATION.md#conversation-mode) | — | [subagents_conversation_mode.md](./designs/subagents_conversation_mode.md) |
+| Form schema propagation | [CONFIGURATION — Form schema propagation](../CONFIGURATION.md#form-schema-propagation) | — | [form_schema_propagation.md](./designs/form_schema_propagation.md) |
 | Conversation starters | [CONFIGURATION — Conversation starters](../CONFIGURATION.md#conversation-starters-configuration) | — | — |
 | MCP resources | [CONFIGURATION — MCP resources](../CONFIGURATION.md#mcp-resources-configuration) | — | [mcp_capabilities_extension.md](./designs/mcp_capabilities_extension.md) |
 | Interactive login (MCP) | [CONFIGURATION — Environment Variables](../CONFIGURATION.md#environment-variables) (`DIAL_INTERACTIVE_LOGIN_TIMEOUT_SECONDS`) | [agent.md](./agent.md) | [interactive_login.md](./designs/interactive_login.md) |
@@ -57,7 +60,7 @@ See [Feature Lifecycle](../README.md#feature-lifecycle) in the root README.
 | ChatHub templates | [chathub.md](./chathub.md) | — | — |
 | Custom CA certs | [custom_ca_certificates.md](./custom_ca_certificates.md) | — | — |
 | Skills (predefined + dial-prompt) | [CONFIGURATION — Skills](../CONFIGURATION.md#skills-configuration) | [skills.md](./skills.md) | [dial_prompts_as_skills.md](./designs/dial_prompts_as_skills.md) |
-| Config-driven hooks | [CONFIGURATION — Hooks](../CONFIGURATION.md#hooks-configuration) | [hooks.md](./hooks.md) | [hook_context_and_lifecycle_events.md](./designs/hook_context_and_lifecycle_events.md) |
+| Config-driven hooks | [CONFIGURATION — Hooks](../CONFIGURATION.md#hooks-configuration) | [hooks.md](./hooks.md) | [hook_context_and_lifecycle_events.md](./designs/hook_context_and_lifecycle_events.md), [background_hooks.md](./designs/background_hooks.md) |
 | Dynamic tool discovery | [CONFIGURATION — Tool discovery](../CONFIGURATION.md#tool-discovery-configuration) | — | [dynamic_tool_discovery.md](./designs/dynamic_tool_discovery.md) |
 | Tools hidden from the model | [CONFIGURATION — MCP tool set](../CONFIGURATION.md#tool-sets-configuration) (`hidden_from_model`) | [hooks.md](./hooks.md#tools-hidden-from-the-model) | [tools_hidden_from_model.md](./designs/tools_hidden_from_model.md) |
 | Web fetch (`internal_web_fetch`) | [CONFIGURATION — Web fetch](../CONFIGURATION.md#web-fetch-configuration) | — | [web_fetch_tool.md](./designs/web_fetch_tool.md) |
@@ -66,6 +69,7 @@ See [Feature Lifecycle](../README.md#feature-lifecycle) in the root README.
 | DIAL skill resources (`dial-skill`) | [CONFIGURATION — Skills](../CONFIGURATION.md#skills-configuration) | [skills.md](./skills.md) | [skills_as_dial_resource.md](./designs/skills_as_dial_resource.md) |
 | Skill invocation from a message | [CONFIGURATION — Environment Variables](../CONFIGURATION.md#environment-variables) / [skills.md](./skills.md#invoking-a-skill-from-a-message) | [skills.md](./skills.md) | [skill_invocation.md](./designs/skill_invocation.md) |
 | DIAL system prompts (`dial`) | [CONFIGURATION — System prompt](../CONFIGURATION.md#system-prompt-configuration) | [agent.md](./agent.md) | — |
+| Skill file references in tool calls (`skill://`) | [skills.md](./skills.md#passing-a-bundled-file-to-a-tool) | [file_transfer.md](./file_transfer.md) | [skill_script_references.md](./designs/skill_script_references.md) |
 | Citation annotation propagation | [CONFIGURATION — Citations](../CONFIGURATION.md#citation-annotations) | [agent.md](./agent.md) | — |
 
 ### Preview
@@ -75,7 +79,6 @@ Require `ENABLE_PREVIEW_FEATURES=true`. May change without a major version bump.
 | Capability | Configure (L1) | Behaviour (L2) | Design (L3) |
 |------------|----------------|----------------|-------------|
 | MCP per-tool configuration | [CONFIGURATION — MCP per-tool](../CONFIGURATION.md#mcp-per-tool-configuration) | — | — |
-| Tool-result offload | [CONFIGURATION — DIAL files offload](../CONFIGURATION.md#tool-call-result-offload) | — | [large_tool_responses.md](./designs/large_tool_responses.md) |
 | Projects (`x-project-id`) | [CONFIGURATION — Projects](../CONFIGURATION.md#projects) | [projects.md](./projects.md) | [projects.md](./designs/projects.md) |
 
 ## Behaviour guides (L2)
